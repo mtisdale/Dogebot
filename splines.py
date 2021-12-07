@@ -48,7 +48,7 @@ import math
 #
 class CubicSpline:
     # Initialize.
-    def __init__(self, p0, v0, pf, vf, T, space='Joint', leg='1'):
+    def __init__(self, p0, v0, pf, vf, T, space='Joint', leg=1):
         # Precompute the spline parameters.
         self.T = T
         self.a = p0
@@ -80,17 +80,17 @@ class CubicSpline:
 
 class Goto(CubicSpline):
     # Use zero initial/final velocities (of same size as positions).
-    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+    def __init__(self, p0, pf, T, space='Joint', leg=1):
         CubicSpline.__init__(self, p0, 0*p0, pf, 0*pf, T, space, leg)
 
 class Hold(Goto):
     # Use the same initial and final positions.
-    def __init__(self, p, T, space='Joint', leg='1'):
+    def __init__(self, p, T, space='Joint', leg=1):
         Goto.__init__(self, p, p, T, space, leg)
 
 class Stay(Hold):
     # Use an infinite time (stay forever).
-    def __init__(self, p, space='Joint', leg='1'):
+    def __init__(self, p, space='Joint', leg=1):
         Hold.__init__(self, p, math.inf, space, leg)
 
 
@@ -103,7 +103,7 @@ class Stay(Hold):
 #
 class QuinticSpline:
     # Initialize.
-    def __init__(self, p0, v0, a0, pf, vf, af, T, space='Joint', leg='1'):
+    def __init__(self, p0, v0, a0, pf, vf, af, T, space='Joint', leg=1):
         # Precompute the six spline parameters.
         self.T = T
         self.a = p0
@@ -137,7 +137,7 @@ class QuinticSpline:
 
 class Goto5(QuinticSpline):
     # Use zero initial/final velocities/accelerations (same size as positions).
-    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+    def __init__(self, p0, pf, T, space='Joint', leg=1):
         QuinticSpline.__init__(self, p0, 0*p0, 0*p0, pf, 0*pf, 0*pf, T, space, leg)
         
 
@@ -150,7 +150,7 @@ class Goto5(QuinticSpline):
 #
 class LinearSpline:
     # Initialize.
-    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+    def __init__(self, p0, pf, T, space='Joint', leg=1):
         # Precompute the two spline parameters.
         self.T = T
         self.a = p0
@@ -180,6 +180,6 @@ class LinearSpline:
 
 class GotoLin(LinearSpline):
     # Uses discontinuous velocity values.
-    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+    def __init__(self, p0, pf, T, space='Joint', leg=1):
         LinearSpline.__init__(self, p0, pf, T, space, leg)
 
