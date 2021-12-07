@@ -105,6 +105,8 @@ class Generator:
         self.kin_2 = kin.Kinematics(robot, 'world', 'tip_2') 
         self.kin_3 = kin.Kinematics(robot, 'world', 'tip_3') 
         self.kin_4 = kin.Kinematics(robot, 'world', 'tip_4')     
+        self.stride_freq = 3.0
+        self.stride_ht = 0.3
         
         
         # Initialize the segment positions MAKE INTO A BETTER ARRAY FOR ALL FOUR FEET LATER
@@ -116,39 +118,42 @@ class Generator:
         (T1, J1) = self.kin_1.fkin(q1)
        
         self.segments = (Hold(x1, 1.0, 'Task'),
-                         Goto5(0.0, 2.0, 6.0, 'Path'),        # For the upwards parabolic movement
-                         Goto5(x2, x1, 3.0, 'Task'))         # For movement along the ground
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path'),        # For the upwards parabolic movement
+                         Goto5(x2, x1, self.stride_freq, 'Task'))         # For movement along the ground
                          
         # Instantiate global variables
         self.index = 0
         self.t0    = 0.0
         self.last_guess = theta_guess
+        self.reset_guess = q1
         self.q_prev = q1
         self.t_prev = 0.0
-        self.lamb = 0.05
+        self.lamb = 0.5
         # Good way to do it? Not completely sure
         self.start_pos = p_from_T(T1)
         self.start_orn = R_from_T(T1)
-        self.stride_freq = 3.0
-        self.stride_ht = 0.5
                          
 #
 #   Path Spline Functions
 #
-    def pd(self, s):
+    def pd(self, s, xi, xf):
+        midx = 0.5*(xf[0]-xi[0])
+        midy = 0.5*(xf[1]-xi[1])
         if s<=1:
-            return np.array([1.0+0.25*s, 0.5, 0.5*s]).reshape((3,1))
+            return np.array([midx*s+xi[0], midy*s+xi[1], self.stride_ht*s]).reshape((3,1))
         else:
-            return np.array([1.0+0.25*s, 0.5, 0.5+0.5*(1-s)]).reshape((3,1))
+            return np.array([midx*s+xi[0], midy*s+xi[1], self.stride_ht*(2-s)]).reshape((3,1))
     
     def Rd(self, s):
         return self.start_orn
     
-    def vd(self, s, sdot):
+    def vd(self, s, sdot, xi, xf):
+        midx = 0.5*(xf[0]-xi[0])
+        midy = 0.5*(xf[1]-xi[1])
         if s<=1:
-            return np.array([0.25*sdot, 0.0, 0.5*sdot]).reshape((3,1))
+            return np.array([midx*sdot, midy*sdot, self.stride_ht*sdot]).reshape((3,1))
         else:
-            return np.array([0.25*sdot, 0.0, -0.5*sdot]).reshape((3,1))
+            return np.array([midx*sdot, midy*sdot, -self.stride_ht*sdot]).reshape((3,1))
     
     def wd(self, s, sdot):
         return np.array([0.0, 0.0, 0.0]).reshape((3,1))
@@ -175,7 +180,7 @@ class Generator:
             # self.index = (self.index+1)
             # If the list were cyclic, you could go back to the start with
             self.index = (self.index+1) % len(self.segments)
-            # self.last_guess = self.reset_guess 
+            self.q_prev = self.reset_guess
             
         # Check whether we are done with all segments
         if (self.index >= len(self.segments)):
@@ -202,7 +207,6 @@ class Generator:
             
             # Compute q and qdot using Velocity IKIN Equations
             xvec = xdot + self.lamb*x_tilda            
-            print(xvec)
             qdot = np.linalg.pinv(J[0:3,:]) @ xvec
             dt = t-self.t_prev
             q = self.q_prev + dt*qdot
@@ -218,20 +222,15 @@ class Generator:
             (cart_position, cart_velocity) = self.segments[self.index].evaluate(t-self.t0)
             position = self.kin_1.ikin(cart_position, self.last_guess)
             (T, J) = self.kin_1.fkin(position)
-            velocity = np.linalg.inv(J[0:3,0:3]) @ cart_velocity
+            velocity = np.linalg.inv(J[0:3,:]) @ cart_velocity
             self.last_guess = position
             
         
-        # Apply the computed pos/vel into joint message
-        i = self.jointdict['hip_1_z']
-        j = self.jointdict['hip_1_x']
-        k = self.jointdict['knee_1']
-        self.jntmsg.position[i] = position[0]
-        self.jntmsg.position[j] = position[1]
-        self.jntmsg.position[k] = position[2]
-        self.jntmsg.velocity[i] = velocity[0]
-        self.jntmsg.velocity[j] = velocity[1]
-        self.jntmsg.velocity[k] = velocity[2]
+        # Apply the computed pos/vel into joint message        
+        #for i in range(len(self.jointdict)):
+        for i in range(3):
+            self.jntmsg.position[i] = position[i]
+            self.jntmsg.velocity[i] = velocity[i]
         
         # Set the root link transform
         self.tfmsg.transform = transform_from_T(T_init)
