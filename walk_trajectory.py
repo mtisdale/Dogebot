@@ -72,7 +72,7 @@ class Generator:
 #                rospy.logwarn("Joint '%s' has unknown type %s", joint.name, joint.type)
 
         # Grab the URDF root link name. This is the link "body" of our URDF
-        root = robot.joints[1].parent
+        root = robot.joints[0].parent
         rospy.loginfo("Root link '%s'", root)
 
         # Instantiate a joint state message.  Pre-populate the joint
@@ -108,9 +108,9 @@ class Generator:
         self.kin = [self.kin_1, self.kin_2, self.kin_3, self.kin_4]
         self.stride_freq = 3.0
         self.stride_ht = 0.3
-        self.legs = [0, 1, 2, 3]        # How the legs are labelled - 1
+        self.legs = [0, 1, 2, 3]                                        # Order of leg cycling
         delta_forward = np.array([0.5, 0.0, 0.0]).reshape((3,1))        # For determining xf
-        delta_backward = np.array([-0.5, 0.0, 0.0]).reshape((3,1))        # For determining xf
+        delta_backward = np.array([-0.5, 0.0, 0.0]).reshape((3,1))      # For determining xf
         
         
         # Initialize the feet positions 
@@ -215,10 +215,9 @@ class Generator:
         if (self.index >= len(self.segments)):
             rospy.signal_shutdown("Done with motion")
             return
-            
-        leg = self.segments[self.index].leg()
         
-        # Determine transform of body, for now fixed
+        
+        # Determine transforms of body, for now fixed
         R_body = Rz(0.0)
         p_body = np.array([0.0, 0.0, 1.0]).reshape((3,1))
         v_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))
@@ -228,6 +227,7 @@ class Generator:
         # Implementation for the different splines    
         if (self.segments[self.index].space() == 'Path'):
             (s, sdot) = self.segments[self.index].evaluate(t-self.t0)
+            leg = self.segments[self.index].leg()
             # Compute errors and Jacobian from equations
             (T, J) = self.kin[leg].fkin(self.q_prev[leg])
             p_diff = self.ep(self.pd(s, self.xi[leg], self.xf[leg]), p_from_T(T))
@@ -242,8 +242,6 @@ class Generator:
             qdot = np.linalg.pinv(J[0:3,:]) @ xvec
             dt = t-self.t_prev
             q = self.q_prev[leg] + dt*qdot
-            position = q
-            velocity = qdot
             
             # Update values to use in next iteration
             self.q_prev[leg] = q
@@ -252,18 +250,18 @@ class Generator:
             
         elif (self.segments[self.index].space() == 'Task'):
             leg = self.segments[self.index].leg()
-            (cart_position, cart_velocity) = self.segments[self.index].evaluate(t-self.t0)
-            pos_prime = R_body.T @ (cart_position - p_body)
-            position = self.kin[leg].ikin(pos_prime, self.last_guess)           # Change to account for the legs later
-            (T, J) = self.kin[leg].fkin(position)
-            vel_prime = R_body.T @ (cart_velocity - v_body - np.cross(w_body, (cart_position-p_body), axis=0))
-            velocity = np.linalg.inv(J[0:3,:]) @ vel_prime                      # Will also need to move cart_vel which is world space, and fkin uses body space)
-            self.last_guess = position
+            (feet_pos, feet_vel) = self.segments[self.index].evaluate(t-self.t0)
+            pos_prime = R_body.T @ (feet_pos-p_body)
+            q = self.kin[leg].ikin(pos_prime, self.last_guess)           # Change to account for the legs later
+            (T, J) = self.kin[leg].fkin(q)
+            vel_prime = R_body.T @ (feet_vel - v_body - np.cross(w_body, (feet_pos-p_body), axis=0))
+            qdot = np.linalg.inv(J[0:3,:]) @ vel_prime                      # Will also need to move cart_vel which is world space, and fkin uses body space)
+            self.last_guess = q
         
         # Apply the computed pos/vel into joint messages
         for i in range(3):  # 3 DOFs per leg
-            self.jntmsg.position[3*(leg)+i] = position[i]
-            self.jntmsg.velocity[3*(leg)+i] = velocity[i]
+            self.jntmsg.position[3*(leg)+i] = q[i]
+            self.jntmsg.velocity[3*(leg)+i] = qdot[i]
         
         
 
