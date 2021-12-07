@@ -48,7 +48,7 @@ import math
 #
 class CubicSpline:
     # Initialize.
-    def __init__(self, p0, v0, pf, vf, T, space='Joint'):
+    def __init__(self, p0, v0, pf, vf, T, space='Joint', leg='1'):
         # Precompute the spline parameters.
         self.T = T
         self.a = p0
@@ -57,10 +57,15 @@ class CubicSpline:
         self.d = -2*(pf-p0)/T**3 + vf/T**2 +   v0/T**2
         # Save the space
         self.usespace = space
+        self.whichleg = leg
 
     # Return the segment's space
     def space(self):
         return self.usespace
+        
+    # Return the leg on which the spline is being used
+    def leg(self):
+        return self.whichleg
 
     # Report the segment's duration (time length).
     def duration(self):
@@ -75,18 +80,18 @@ class CubicSpline:
 
 class Goto(CubicSpline):
     # Use zero initial/final velocities (of same size as positions).
-    def __init__(self, p0, pf, T, space='Joint'):
-        CubicSpline.__init__(self, p0, 0*p0, pf, 0*pf, T, space)
+    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+        CubicSpline.__init__(self, p0, 0*p0, pf, 0*pf, T, space, leg)
 
 class Hold(Goto):
     # Use the same initial and final positions.
-    def __init__(self, p, T, space='Joint'):
-        Goto.__init__(self, p, p, T, space)
+    def __init__(self, p, T, space='Joint', leg='1'):
+        Goto.__init__(self, p, p, T, space, leg)
 
 class Stay(Hold):
     # Use an infinite time (stay forever).
-    def __init__(self, p, space='Joint'):
-        Hold.__init__(self, p, math.inf, space)
+    def __init__(self, p, space='Joint', leg='1'):
+        Hold.__init__(self, p, math.inf, space, leg)
 
 
 #
@@ -98,7 +103,7 @@ class Stay(Hold):
 #
 class QuinticSpline:
     # Initialize.
-    def __init__(self, p0, v0, a0, pf, vf, af, T, space='Joint'):
+    def __init__(self, p0, v0, a0, pf, vf, af, T, space='Joint', leg='1'):
         # Precompute the six spline parameters.
         self.T = T
         self.a = p0
@@ -109,10 +114,15 @@ class QuinticSpline:
         self.f =  -6*p0/T**5 - 3*v0/T**4 - 1*a0/T**3 +  6*pf/T**5 - 3*vf/T**4 + 0.5*af/T**3
         # Also save the space
         self.usespace = space
+        self.whichleg = leg
 
     # Return the segment's space
     def space(self):
         return self.usespace
+        
+    # Return the leg on which the spline is being used
+    def leg(self):
+        return self.whichleg
 
     # Report the segment's duration (time length).
     def duration(self):
@@ -127,8 +137,8 @@ class QuinticSpline:
 
 class Goto5(QuinticSpline):
     # Use zero initial/final velocities/accelerations (same size as positions).
-    def __init__(self, p0, pf, T, space='Joint'):
-        QuinticSpline.__init__(self, p0, 0*p0, 0*p0, pf, 0*pf, 0*pf, T, space)
+    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+        QuinticSpline.__init__(self, p0, 0*p0, 0*p0, pf, 0*pf, 0*pf, T, space, leg)
         
 
 #
@@ -140,17 +150,22 @@ class Goto5(QuinticSpline):
 #
 class LinearSpline:
     # Initialize.
-    def __init__(self, p0, pf, T, space='Joint'):
+    def __init__(self, p0, pf, T, space='Joint', leg='1'):
         # Precompute the two spline parameters.
         self.T = T
         self.a = p0
         self.b = (pf-p0)/T
         # Also save the space
         self.usespace = space
+        self.whichleg = leg
 
     # Return the segment's space
     def space(self):
         return self.usespace
+        
+    # Return the leg on which the spline is being used
+    def leg(self):
+        return self.whichleg
 
     # Report the segment's duration (time length).
     def duration(self):
@@ -165,6 +180,6 @@ class LinearSpline:
 
 class GotoLin(LinearSpline):
     # Uses discontinuous velocity values.
-    def __init__(self, p0, pf, T, space='Joint'):
-        LinearSpline.__init__(self, p0, pf, T, space)
+    def __init__(self, p0, pf, T, space='Joint', leg='1'):
+        LinearSpline.__init__(self, p0, pf, T, space, leg)
 
