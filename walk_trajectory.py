@@ -71,10 +71,7 @@ class Generator:
 #                rospy.logwarn("Joint '%s' has unknown type %s", joint.name, joint.type)
 
         # Grab the URDF root link name. This is the link "body" of our URDF
-        root = robot.joints[0].parent
-        print()
-        print(root)
-        print()
+        root = robot.joints[1].parent
         rospy.loginfo("Root link '%s'", root)
 
         # Instantiate a joint state message.  Pre-populate the joint
@@ -102,10 +99,10 @@ class Generator:
         rospy.Subscriber('/boolean', Bool, self.receive_Bool)
 
         # Instantiate the Kinematics
-        self.kin_1 = kin.Kinematics(robot, 'body', 'tip_1') 
-        self.kin_2 = kin.Kinematics(robot, 'body', 'tip_2') 
-        self.kin_3 = kin.Kinematics(robot, 'body', 'tip_3') 
-        self.kin_4 = kin.Kinematics(robot, 'body', 'tip_4')            
+        self.kin_1 = kin.Kinematics(robot, 'world', 'tip_1') 
+        self.kin_2 = kin.Kinematics(robot, 'world', 'tip_2') 
+        self.kin_3 = kin.Kinematics(robot, 'world', 'tip_3') 
+        self.kin_4 = kin.Kinematics(robot, 'world', 'tip_4')     
         
         
         # Initialize the segment positions MAKE INTO A BETTER ARRAY FOR ALL FOUR FEET LATER
@@ -115,18 +112,16 @@ class Generator:
         q1 = self.kin_1.ikin(x1, theta_guess)
         q2 = self.kin_1.ikin(x2, theta_guess)
         
-        self.segments = (Goto(q1, q2, 3.0, 'Joint'),        # For the upwards parabolic movement
+        self.segments = (Goto(q1, q2, 3.0, 'Path'),        # For the upwards parabolic movement
                          Goto(x2, x1, 3.0, 'Task'))         # For movement along the ground
         self.index = 0
         self.t0    = 0.0
         self.last_guess = theta_guess
 
 
-
     def receive_Bool(self, msg):
         print(msg.data)
-        print()
-        
+
     # Update every 10ms!
     def update(self, t):
 
@@ -144,6 +139,11 @@ class Generator:
             rospy.signal_shutdown("Done with motion")
             return
             
+            
+        # Determine transform of body, for now fixed
+        R_init = Rz(0.0)
+        p_init = np.array([0.0, 0.0, 1.0]).reshape((3,1))
+        T_init = T_from_Rp(R_init, p_init)
         
         # Implementation for the different splines    
         if (self.segments[self.index].space() == 'Joint'):
@@ -158,7 +158,7 @@ class Generator:
             velocity = np.linalg.inv(J[0:3,0:3]) @ cart_velocity
             self.last_guess = position
             
-            
+        
         # Apply the computed pos/vel into joint message
         i = self.jointdict['hip_1_z']
         j = self.jointdict['hip_1_x']
@@ -169,11 +169,6 @@ class Generator:
         self.jntmsg.velocity[i] = velocity[0]
         self.jntmsg.velocity[j] = velocity[1]
         self.jntmsg.velocity[k] = velocity[2]
-
-        # For a fixed body, maybe depends on inputs here
-        R_init = Rz(0.0)
-        p_init = np.array([0.0, 0.0, 1.0]).reshape((3,1))
-        T_init = T_from_Rp(R_init, p_init)
         
         # Set the root link transform
         self.tfmsg.transform = transform_from_T(T_init)
