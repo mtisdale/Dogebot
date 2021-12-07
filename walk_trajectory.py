@@ -14,7 +14,7 @@ from geometry_msgs.msg   import Vector3, Quaternion, Transform, TransformStamped
 from std_msgs.msg        import Bool
 
 from splines import CubicSpline, Goto, Hold, Stay, QuinticSpline, Goto5
-from kinematics import p_from_T, q_from_T, T_from_Rp, Rx, Ry, Rz
+from kinematics import p_from_T, q_from_T, R_from_T, T_from_Rp, Rx, Ry, Rz
 
 
 #
@@ -42,6 +42,7 @@ def transform_from_T(T):
 
     # Return the transform
     return trans
+
 
 #
 #  Generator Class
@@ -98,6 +99,7 @@ class Generator:
         
         rospy.Subscriber('/boolean', Bool, self.receive_Bool)
 
+
         # Instantiate the Kinematics
         self.kin_1 = kin.Kinematics(robot, 'world', 'tip_1') 
         self.kin_2 = kin.Kinematics(robot, 'world', 'tip_2') 
@@ -108,15 +110,56 @@ class Generator:
         # Initialize the segment positions MAKE INTO A BETTER ARRAY FOR ALL FOUR FEET LATER
         theta_guess = np.array([0.0, 0.0, 0.0]).reshape((3,1))
         x1 = np.array([1.0, 0.5, 0.0]).reshape((3,1))       # Starting foot 1 placement 
-        x2 = np.array([1.75, 0.5, 0.0]).reshape((3,1))       # Ending foot 1 placement 
+        x2 = np.array([1.5, 0.5, 0.0]).reshape((3,1))       # Ending foot 1 placement 
         q1 = self.kin_1.ikin(x1, theta_guess)
         q2 = self.kin_1.ikin(x2, theta_guess)
-        
-        self.segments = (Goto(q1, q2, 3.0, 'Path'),        # For the upwards parabolic movement
-                         Goto(x2, x1, 3.0, 'Task'))         # For movement along the ground
+        (T1, J1) = self.kin_1.fkin(q1)
+       
+        self.segments = (Hold(x1, 1.0, 'Task'),
+                         Goto5(0.0, 2.0, 6.0, 'Path'),        # For the upwards parabolic movement
+                         Goto5(x2, x1, 3.0, 'Task'))         # For movement along the ground
+                         
+        # Instantiate global variables
         self.index = 0
         self.t0    = 0.0
         self.last_guess = theta_guess
+        self.q_prev = q1
+        self.t_prev = 0.0
+        self.lamb = 0.05
+        # Good way to do it? Not completely sure
+        self.start_pos = p_from_T(T1)
+        self.start_orn = R_from_T(T1)
+        self.stride_freq = 3.0
+        self.stride_ht = 0.5
+                         
+#
+#   Path Spline Functions
+#
+    def pd(self, s):
+        if s<=1:
+            return np.array([1.0+0.25*s, 0.5, 0.5*s]).reshape((3,1))
+        else:
+            return np.array([1.0+0.25*s, 0.5, 0.5+0.5*(1-s)]).reshape((3,1))
+    
+    def Rd(self, s):
+        return self.start_orn
+    
+    def vd(self, s, sdot):
+        if s<=1:
+            return np.array([0.25*sdot, 0.0, 0.5*sdot]).reshape((3,1))
+        else:
+            return np.array([0.25*sdot, 0.0, -0.5*sdot]).reshape((3,1))
+    
+    def wd(self, s, sdot):
+        return np.array([0.0, 0.0, 0.0]).reshape((3,1))
+        
+    def ep(self, pd, p):
+        return (pd-p)
+    
+    def eR(self, Rd, R):
+        return 0.5*(np.cross(R[:,0:1], Rd[:,0:1], axis=0) +
+                    np.cross(R[:,1:2], Rd[:,1:2], axis=0) +
+                    np.cross(R[:,2:3], Rd[:,2:3], axis=0))
 
 
     def receive_Bool(self, msg):
@@ -146,9 +189,29 @@ class Generator:
         T_init = T_from_Rp(R_init, p_init)
         
         # Implementation for the different splines    
-        if (self.segments[self.index].space() == 'Joint'):
-            # Joint space spline actually causes it to drag across the ground... Need to have secondary task maybe?
-            (position, velocity) = self.segments[self.index].evaluate(t-self.t0)
+        if (self.segments[self.index].space() == 'Path'):
+            (s, sdot) = self.segments[self.index].evaluate(t-self.t0)
+            # Compute errors and Jacobian from equations
+            (T, J) = self.kin_1.fkin(self.q_prev)
+            p_diff = self.ep(self.pd(s), p_from_T(T))
+            #R_diff = self.eR(self.Rd(s), R_from_T(T))
+            #x_tilda = np.vstack((p_diff, R_diff))
+            x_tilda = p_diff
+            #xdot = np.vstack((self.vd(s,sdot), self.wd(s,sdot)))
+            xdot = self.vd(s,sdot)
+            
+            # Compute q and qdot using Velocity IKIN Equations
+            xvec = xdot + self.lamb*x_tilda            
+            print(xvec)
+            qdot = np.linalg.pinv(J[0:3,:]) @ xvec
+            dt = t-self.t_prev
+            q = self.q_prev + dt*qdot
+            position = q
+            velocity = qdot
+            
+            # Update values to use in next iteration
+            self.q_prev = q
+            self.t_prev = t
             
         elif (self.segments[self.index].space() == 'Task'):
             # Test to see if this is even gonna work lmao
