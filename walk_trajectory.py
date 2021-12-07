@@ -108,7 +108,7 @@ class Generator:
         self.kin = [self.kin_1, self.kin_2, self.kin_3, self.kin_4]
         self.stride_freq = 3.0
         self.stride_ht = 0.3
-        self.legs = [1, 2, 3, 4]        # How the legs are labelled
+        self.legs = [0, 1, 2, 3]        # How the legs are labelled - 1
         delta_forward = np.array([0.5, 0.0, 0.0]).reshape((3,1))        # For determining xf
         delta_backward = np.array([-0.5, 0.0, 0.0]).reshape((3,1))        # For determining xf
         
@@ -130,49 +130,55 @@ class Generator:
         self.t_prev = 0.0
         self.lamb = 0.5
         
-        self.last_guess = [theta_guess] * len(self.legs)       
+        #self.last_guess = [q1, q2, q3, q4]                     # Make into 4 legs later
+        self.last_guess = theta_guess
         self.reset_guess = [q1, q2, q3, q4]                     # Aligned with URDF leg chain numbers
         self.q_prev = [q1, q2, q3, q4]                          # Aligned with URDF leg chain numbers    
-        self.xi = [x1, x2, x3, x4]                              # Aligned with URDF leg chain numbers
-        self.xf = self.xi + [delta_forward] * len(self.legs)    # Hopefully the syntax checks out
         
+        self.xi = [x1, x2, x3, x4]                              # Aligned with URDF leg chain numbers
+        self.xf = [0, 0, 0, 0]
+        for i in range(len(self.legs)):
+            self.xf[i] = self.xi[i] + delta_forward
                 
         # Good way to do it? Not completely sure
         #(T1, J1) = self.kin_1.fkin(q1)
         #self.start_pos = p_from_T(T1)
         #self.start_orn = R_from_T(T1)
-        self.start_orn = Rz(0.0)        # Placeholder
-                         
+        self.start_orn = Rz(0.0)        # Placeholder       # Instantiate the segments
+        
+        self.segments = (Hold(x1, 1.0, 'Task'),
+                        Goto5(0.0, 2.0, self.stride_freq, 'Path', 0),
+                        Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', 0))
        
        
        # Instantiate the segments
-        self.segments = (Hold(x1, 1.0, 'Task'),
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                          # For the upwards parabolic movement
-                         Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]))            # For movement along the ground 
+#        self.segments = (Hold(x1, 1.0, 'Task'),
+#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
+#                         Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
+#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
+#                         Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
+#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
+#                         Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
+#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                          # For the upwards parabolic movement
+#                         Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]))            # For movement along the ground 
 
 #
 #   Path Spline Functions
 #
     def pd(self, s, xi, xf):
-        midx = 0.5*(xf[0]-xi[0])
-        midy = 0.5*(xf[1]-xi[1])
+        midx = 0.5*(xf[0,0]-xi[0,0])
+        midy = 0.5*(xf[1,0]-xi[1,0])
         if s<=1:
-            return np.array([midx*s+xi[0], midy*s+xi[1], self.stride_ht*s]).reshape((3,1))
+            return np.array([midx*s+xi[0,0], midy*s+xi[1,0], self.stride_ht*s]).reshape((3,1))
         else:
-            return np.array([midx*s+xi[0], midy*s+xi[1], self.stride_ht*(2-s)]).reshape((3,1))
+            return np.array([midx*s+xi[0,0], midy*s+xi[1,0], self.stride_ht*(2-s)]).reshape((3,1))
     
     def Rd(self, s):
         return self.start_orn
     
     def vd(self, s, sdot, xi, xf):
-        midx = 0.5*(xf[0]-xi[0])
-        midy = 0.5*(xf[1]-xi[1])
+        midx = 0.5*(xf[0,0]-xi[0,0])
+        midy = 0.5*(xf[1,0]-xi[1,0])
         if s<=1:
             return np.array([midx*sdot, midy*sdot, self.stride_ht*sdot]).reshape((3,1))
         else:
@@ -196,21 +202,22 @@ class Generator:
     # Update every 10ms!
     def update(self, t):
 
-        leg = self.segments[self.index].leg()
         # If the current segment is done, shift to the next.
         if (t - self.t0 >= self.segments[self.index].duration()):
             self.t0    = self.t0 + self.segments[self.index].duration()
             # self.index = (self.index+1)
             # If the list were cyclic, you could go back to the start with
             self.index = (self.index+1) % len(self.segments)
-            self.q_prev[leg] = self.reset_guess[leg]
+            leg = self.segments[self.index].leg()
+            self.q_prev[leg] = self.reset_guess[leg]                # Might need to change this, what is this leg? Prev or Curr?
             
         # Check whether we are done with all segments
         if (self.index >= len(self.segments)):
             rospy.signal_shutdown("Done with motion")
             return
             
-            
+        leg = self.segments[self.index].leg()
+        
         # Determine transform of body, for now fixed
         R_init = Rz(0.0)
         p_init = np.array([0.0, 0.0, 1.0]).reshape((3,1))
@@ -242,16 +249,17 @@ class Generator:
                 
             
         elif (self.segments[self.index].space() == 'Task'):
+            leg = self.segments[self.index].leg()
             (cart_position, cart_velocity) = self.segments[self.index].evaluate(t-self.t0)
-            position = self.kin[leg].ikin(cart_position, self.last_guess[leg])
+            position = self.kin[leg].ikin(cart_position, self.last_guess)           # Change to account for the legs later
             (T, J) = self.kin[leg].fkin(position)
-            velocity = np.linalg.inv(J[0:3,:]) @ cart_velocity
-            self.last_guess[leg] = position
+            velocity = np.linalg.inv(J[0:3,:]) @ cart_velocity                      # Will also need to move cart_vel which is world space, and fkin uses body space)
+            self.last_guess = position
         
         # Apply the computed pos/vel into joint messages
         for i in range(3):  # 3 DOFs per leg
-            self.jntmsg.position[3*(leg-1)+i] = position[i]
-            self.jntmsg.velocity[3*(leg-1)+i] = velocity[i]
+            self.jntmsg.position[3*(leg)+i] = position[i]
+            self.jntmsg.velocity[3*(leg)+i] = velocity[i]
         
         
 
