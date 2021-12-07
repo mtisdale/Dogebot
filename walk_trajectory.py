@@ -125,6 +125,7 @@ class Generator:
 
     def receive_Bool(self, msg):
         print(msg.data)
+        print()
         
     # Update every 10ms!
     def update(self, t):
