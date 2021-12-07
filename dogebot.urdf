@@ -31,15 +31,6 @@
        happens before the continuous joint rotates around 'axis'. -->
 
 <!-- ******************** World and Body ******************* -->
-  <link name="world"> 
-  </link>
-  
-<joint name="world_to_body" type="fixed">
-    <parent link="world"/>
-    <child  link="body"/>
-    <origin xyz="0 0 1" rpy="0 0 0"/>
-  </joint>
-
   <link name="body"> 
     <visual>
         <geometry>

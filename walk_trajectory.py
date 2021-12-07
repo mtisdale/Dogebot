@@ -101,10 +101,10 @@ class Generator:
 
 
         # Instantiate the Kinematics
-        self.kin_1 = kin.Kinematics(robot, 'world', 'tip_1') 
-        self.kin_2 = kin.Kinematics(robot, 'world', 'tip_2') 
-        self.kin_3 = kin.Kinematics(robot, 'world', 'tip_3') 
-        self.kin_4 = kin.Kinematics(robot, 'world', 'tip_4')     
+        self.kin_1 = kin.Kinematics(robot, 'body', 'tip_1') 
+        self.kin_2 = kin.Kinematics(robot, 'body', 'tip_2') 
+        self.kin_3 = kin.Kinematics(robot, 'body', 'tip_3') 
+        self.kin_4 = kin.Kinematics(robot, 'body', 'tip_4')     
         self.kin = [self.kin_1, self.kin_2, self.kin_3, self.kin_4]
         self.stride_freq = 3.0
         self.stride_ht = 0.3
@@ -219,9 +219,11 @@ class Generator:
         leg = self.segments[self.index].leg()
         
         # Determine transform of body, for now fixed
-        R_init = Rz(0.0)
-        p_init = np.array([0.0, 0.0, 1.0]).reshape((3,1))
-        T_init = T_from_Rp(R_init, p_init)
+        R_body = Rz(0.0)
+        p_body = np.array([0.0, 0.0, 1.0]).reshape((3,1))
+        v_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))
+        w_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))       
+        T_body = T_from_Rp(R_body, p_body)
         
         # Implementation for the different splines    
         if (self.segments[self.index].space() == 'Path'):
@@ -251,9 +253,11 @@ class Generator:
         elif (self.segments[self.index].space() == 'Task'):
             leg = self.segments[self.index].leg()
             (cart_position, cart_velocity) = self.segments[self.index].evaluate(t-self.t0)
-            position = self.kin[leg].ikin(cart_position, self.last_guess)           # Change to account for the legs later
+            pos_prime = R_body.T @ (cart_position - p_body)
+            position = self.kin[leg].ikin(pos_prime, self.last_guess)           # Change to account for the legs later
             (T, J) = self.kin[leg].fkin(position)
-            velocity = np.linalg.inv(J[0:3,:]) @ cart_velocity                      # Will also need to move cart_vel which is world space, and fkin uses body space)
+            vel_prime = R_body.T @ (cart_velocity - v_body - np.cross(w_body, (cart_position-p_body), axis=0))
+            velocity = np.linalg.inv(J[0:3,:]) @ vel_prime                      # Will also need to move cart_vel which is world space, and fkin uses body space)
             self.last_guess = position
         
         # Apply the computed pos/vel into joint messages
@@ -265,7 +269,7 @@ class Generator:
 
         
         # Set the root link transform
-        self.tfmsg.transform = transform_from_T(T_init)
+        self.tfmsg.transform = transform_from_T(T_body)
 
         # Send the joint command and root link transform (with the current time).
         timestamp = rospy.Time.now()
