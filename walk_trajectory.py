@@ -139,12 +139,6 @@ class Generator:
         self.xf = [0, 0, 0, 0]
         for i in range(len(self.legs)):
             self.xf[i] = self.xi[i] + delta_forward
-                
-        # Good way to do it? Not completely sure
-        #(T1, J1) = self.kin_1.fkin(q1)
-        #self.start_pos = p_from_T(T1)
-        #self.start_orn = R_from_T(T1)
-        self.start_orn = Rz(0.0)        # Placeholder       # Instantiate the segments
         
         self.segments = (Hold(x1, 1.0, 'Task'),
                         Goto5(0.0, 2.0, self.stride_freq, 'Path', 0),
@@ -173,9 +167,6 @@ class Generator:
         else:
             return np.array([midx*s+xi[0,0], midy*s+xi[1,0], self.stride_ht*(2-s)]).reshape((3,1))
     
-    def Rd(self, s):
-        return self.start_orn
-    
     def vd(self, s, sdot, xi, xf):
         midx = 0.5*(xf[0,0]-xi[0,0])
         midy = 0.5*(xf[1,0]-xi[1,0])
@@ -183,17 +174,9 @@ class Generator:
             return np.array([midx*sdot, midy*sdot, self.stride_ht*sdot]).reshape((3,1))
         else:
             return np.array([midx*sdot, midy*sdot, -self.stride_ht*sdot]).reshape((3,1))
-    
-    def wd(self, s, sdot):
-        return np.array([0.0, 0.0, 0.0]).reshape((3,1))
         
     def ep(self, pd, p):
         return (pd-p)
-    
-    def eR(self, Rd, R):
-        return 0.5*(np.cross(R[:,0:1], Rd[:,0:1], axis=0) +
-                    np.cross(R[:,1:2], Rd[:,1:2], axis=0) +
-                    np.cross(R[:,2:3], Rd[:,2:3], axis=0))
 
 
     def receive_Bool(self, msg):
@@ -230,11 +213,7 @@ class Generator:
             leg = self.segments[self.index].leg()
             # Compute errors and Jacobian from equations
             (T, J) = self.kin[leg].fkin(self.q_prev[leg])
-            p_diff = self.ep(self.pd(s, self.xi[leg], self.xf[leg]), p_from_T(T))
-            #R_diff = self.eR(self.Rd(s), R_from_T(T))
-            #x_tilda = np.vstack((p_diff, R_diff))
-            x_tilda = p_diff
-            #xdot = np.vstack((self.vd(s,sdot), self.wd(s,sdot)))
+            x_tilda = self.ep(self.pd(s, self.xi[leg], self.xf[leg]), p_from_T(T))
             xdot = self.vd(s, sdot, self.xi[leg], self.xf[leg])
             
             # Compute q and qdot using Velocity IKIN Equations
