@@ -11,11 +11,11 @@
 
 
   <!-- Start the code for a walking trajectory.  -->
-  <node pkg ="demo133"
+  <!-- <node pkg ="demo133"
 	type="walk_trajectory.py"
 	name="dogebot"
-	output="screen">
-  </node>
+	output="screen"> 
+  </node> -->
 
 
   <!-- Start the ROS kinematic chain processing. -->
