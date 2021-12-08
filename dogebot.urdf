@@ -1,0 +1,443 @@
+<?xml version="1.0"?>
+
+<robot name="dogebot">
+
+
+  <!-- *************************************************** -->
+  <!-- ******************* RVIZ Colors ******************* -->
+  <!-- *************************************************** -->
+
+  <material name="white">    <color rgba="1.00 1.00 1.00 1"/>  </material>
+  <material name="gray">     <color rgba="0.60 0.60 0.60 1"/>  </material>
+  <material name="table">    <color rgba="0.85 0.77 0.77 1"/>  </material>
+  <material name="black">    <color rgba="0.00 0.00 0.00 1"/>  </material>
+
+  <material name="red">      <color rgba="1.00 0.00 0.00 1"/>  </material>
+  <material name="green">    <color rgba="0.00 1.00 0.00 1"/>  </material>
+  <material name="blue">     <color rgba="0.00 0.00 1.00 1"/>  </material>
+
+  <material name="cyan">     <color rgba="0.00 1.00 1.00 1"/>  </material>
+  <material name="magenta">  <color rgba="1.00 0.00 1.00 1"/>  </material>
+  <material name="yellow">   <color rgba="1.00 1.00 0.00 1"/>  </material>
+
+  <material name="orange">   <color rgba="1.00 0.65 0.00 1"/>  </material>
+
+  
+  <!-- *************************************************** -->
+  <!-- ******************** Kinematics ******************* -->
+  <!-- *************************************************** -->
+  <!-- Note the 'origin' tag in the joints defines the shift and
+       reorientation, i.e. the transform.  For moving joints, this
+       happens before the continuous joint rotates around 'axis'. -->
+
+<!-- ******************** World and Body ******************* -->
+  <link name="world"> 
+  </link>
+  
+<joint name="world_to_body" type="fixed">
+    <parent link="world"/>
+    <child  link="body"/>
+    <origin xyz="0 0 1" rpy="0 0 0"/>
+  </joint>
+
+  <link name="body"> 
+    <visual>
+        <geometry>
+            <box size= "2 1 0.1"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <material name="gray"/>
+    </visual>
+  </link>
+  
+<!-- ******************** Leg 1 Chain ******************* -->  
+
+<!-- *** Translation: body to hip joint *** -->
+  <joint name="body_1" type="fixed">
+    <parent link="body"/>
+    <child  link="body_leg_1_link"/>
+    <origin xyz="1 0.5 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="body_leg_1_link">
+  </link>
+
+<!-- *** Rotation about z: hip joint *** -->
+  <joint name="hip_1_z" type="continuous">
+    <parent link="body_leg_1_link"/>
+    <child  link="hip_1_link"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="hip_1_link">
+    <visual>
+        <geometry>
+            <sphere radius="0.1"/>
+        </geometry>
+        <material name="blue"/>
+    </visual>
+  </link>
+  
+<!-- *** Rotation about x: hip joint *** -->
+  <joint name="hip_1_x" type="continuous">
+    <parent link="hip_1_link"/>
+    <child  link="thigh_1"/>
+    <origin xyz="0 0 0" rpy="0 0 0.7854"/>
+    <axis   xyz="1 0 0"/>
+  </joint>
+
+  <link name="thigh_1">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0 0.35 0" rpy="1.5708 0 0"/>
+        <material name="white"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: hip to knee joint *** -->
+  <joint name="thighlink_1" type="fixed">
+    <parent link="thigh_1"/>
+    <child  link="thighlink_1"/>
+    <origin xyz="0 0.7 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thighlink_1">
+    <visual>
+        <geometry>
+            <cylinder length="0.2" radius="0.05"/>
+        </geometry>
+        <material name="black"/>
+    </visual>   
+  </link>
+
+<!-- *** Rotation: knee joint *** -->
+  <joint name="knee_1" type="continuous">
+    <parent link="thighlink_1"/>
+    <child  link="calf_1"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="calf_1">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0.35 0 0" rpy="0 1.5708 0"/>
+        <material name="green"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: knee to calf joint *** -->
+  <joint name="calflink_1" type="fixed">
+    <parent link="calf_1"/>
+    <child  link="tip_1"/>
+    <origin xyz="0.7 0 0" rpy="0 0 0"/>
+  </joint>
+  
+  <link name="tip_1">
+    <visual>
+        <geometry>
+            <sphere radius="0.05"/>
+        </geometry>
+        <material name="magenta"/>
+    </visual>
+  </link>
+  
+  
+<!-- ******************** Leg 2 Chain ******************* -->  
+
+<!-- *** Translation: body to hip joint *** -->
+  <joint name="body_2" type="fixed">
+    <parent link="body"/>
+    <child  link="body_leg_2_link"/>
+    <origin xyz="1 -0.5 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="body_leg_2_link">
+  </link>
+
+<!-- *** Rotation about z: hip joint *** -->
+  <joint name="hip_2_z" type="continuous">
+    <parent link="body_leg_2_link"/>
+    <child  link="hip_2_link"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="hip_2_link">
+    <visual>
+        <geometry>
+            <sphere radius="0.1"/>
+        </geometry>
+        <material name="blue"/>
+    </visual>
+  </link>
+  
+<!-- *** Rotation about x: hip joint *** -->
+  <joint name="hip_2_x" type="continuous">
+    <parent link="hip_2_link"/>
+    <child  link="thigh_2"/>
+    <origin xyz="0 0 0" rpy="0 0 0.7854"/>
+    <axis   xyz="1 0 0"/>
+  </joint>
+
+  <link name="thigh_2">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0 0.35 0" rpy="1.5708 0 0"/>
+        <material name="white"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: hip to knee joint *** -->
+  <joint name="thighlink_2" type="fixed">
+    <parent link="thigh_2"/>
+    <child  link="thighlink_2"/>
+    <origin xyz="0 0.7 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thighlink_2">
+    <visual>
+        <geometry>
+            <cylinder length="0.2" radius="0.05"/>
+        </geometry>
+        <material name="black"/>
+    </visual>   
+  </link>
+
+<!-- *** Rotation: knee joint *** -->
+  <joint name="knee_2" type="continuous">
+    <parent link="thighlink_2"/>
+    <child  link="calf_2"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="calf_2">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0.35 0 0" rpy="0 1.5708 0"/>
+        <material name="green"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: knee to calf joint *** -->
+  <joint name="calflink_2" type="fixed">
+    <parent link="calf_2"/>
+    <child  link="tip_2"/>
+    <origin xyz="0.7 0 0" rpy="0 0 0"/>
+  </joint>
+  
+  <link name="tip_2">
+    <visual>
+        <geometry>
+            <sphere radius="0.05"/>
+        </geometry>
+        <material name="magenta"/>
+    </visual>
+  </link>
+  
+
+<!-- ******************** Leg 3 Chain ******************* -->  
+
+<!-- *** Translation: body to hip joint *** -->
+  <joint name="body_3" type="fixed">
+    <parent link="body"/>
+    <child  link="body_leg_3_link"/>
+    <origin xyz="-1 0.5 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="body_leg_3_link">
+  </link>
+
+<!-- *** Rotation about z: hip joint *** -->
+  <joint name="hip_3_z" type="continuous">
+    <parent link="body_leg_3_link"/>
+    <child  link="hip_3_link"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="hip_3_link">
+    <visual>
+        <geometry>
+            <sphere radius="0.1"/>
+        </geometry>
+        <material name="blue"/>
+    </visual>
+  </link>
+  
+<!-- *** Rotation about x: hip joint *** -->
+  <joint name="hip_3_x" type="continuous">
+    <parent link="hip_3_link"/>
+    <child  link="thigh_3"/>
+    <origin xyz="0 0 0" rpy="0 0 0.7854"/>
+    <axis   xyz="1 0 0"/>
+  </joint>
+
+  <link name="thigh_3">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0 0.35 0" rpy="1.5708 0 0"/>
+        <material name="white"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: hip to knee joint *** -->
+  <joint name="thighlink_3" type="fixed">
+    <parent link="thigh_3"/>
+    <child  link="thighlink_3"/>
+    <origin xyz="0 0.7 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thighlink_3">
+    <visual>
+        <geometry>
+            <cylinder length="0.2" radius="0.05"/>
+        </geometry>
+        <material name="black"/>
+    </visual>   
+  </link>
+
+<!-- *** Rotation: knee joint *** -->
+  <joint name="knee_3" type="continuous">
+    <parent link="thighlink_3"/>
+    <child  link="calf_3"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="calf_3">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0.35 0 0" rpy="0 1.5708 0"/>
+        <material name="green"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: knee to calf joint *** -->
+  <joint name="calflink_3" type="fixed">
+    <parent link="calf_3"/>
+    <child  link="tip_3"/>
+    <origin xyz="0.7 0 0" rpy="0 0 0"/>
+  </joint>
+  
+  <link name="tip_3">
+    <visual>
+        <geometry>
+            <sphere radius="0.05"/>
+        </geometry>
+        <material name="magenta"/>
+    </visual>
+  </link>
+  
+  
+<!-- ******************** Leg 4 Chain ******************* -->  
+
+<!-- *** Translation: body to hip joint *** -->
+  <joint name="body_4" type="fixed">
+    <parent link="body"/>
+    <child  link="body_leg_4_link"/>
+    <origin xyz="-1 -0.5 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="body_leg_4_link">
+  </link>
+
+<!-- *** Rotation about z: hip joint *** -->
+  <joint name="hip_4_z" type="continuous">
+    <parent link="body_leg_4_link"/>
+    <child  link="hip_4_link"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="hip_4_link">
+    <visual>
+        <geometry>
+            <sphere radius="0.1"/>
+        </geometry>
+        <material name="blue"/>
+    </visual>
+  </link>
+  
+<!-- *** Rotation about x: hip joint *** -->
+  <joint name="hip_4_x" type="continuous">
+    <parent link="hip_4_link"/>
+    <child  link="thigh_4"/>
+    <origin xyz="0 0 0" rpy="0 0 0.7854"/>
+    <axis   xyz="1 0 0"/>
+  </joint>
+
+  <link name="thigh_4">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0 0.35 0" rpy="1.5708 0 0"/>
+        <material name="white"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: hip to knee joint *** -->
+  <joint name="thighlink_4" type="fixed">
+    <parent link="thigh_4"/>
+    <child  link="thighlink_4"/>
+    <origin xyz="0 0.7 0" rpy="0 0 0"/>
+  </joint>
+
+  <link name="thighlink_4">
+    <visual>
+        <geometry>
+            <cylinder length="0.2" radius="0.05"/>
+        </geometry>
+        <material name="black"/>
+    </visual>   
+  </link>
+
+<!-- *** Rotation: knee joint *** -->
+  <joint name="knee_4" type="continuous">
+    <parent link="thighlink_4"/>
+    <child  link="calf_4"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis   xyz="0 0 1"/>
+  </joint>
+
+  <link name="calf_4">
+    <visual>
+        <geometry>
+            <cylinder length="0.7" radius="0.02"/>
+        </geometry>
+        <origin xyz="0.35 0 0" rpy="0 1.5708 0"/>
+        <material name="green"/>
+    </visual>
+  </link>
+
+<!-- *** Translation: knee to calf joint *** -->
+  <joint name="calflink_4" type="fixed">
+    <parent link="calf_4"/>
+    <child  link="tip_4"/>
+    <origin xyz="0.7 0 0" rpy="0 0 0"/>
+  </joint>
+  
+  <link name="tip_4">
+    <visual>
+        <geometry>
+            <sphere radius="0.05"/>
+        </geometry>
+        <material name="magenta"/>
+    </visual>
+  </link>
+</robot>
