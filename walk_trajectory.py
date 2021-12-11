@@ -116,11 +116,11 @@ class Generator:
         self.lamb = 0.5
         self.reset_guess = theta_0       
         self.q_prev = [theta_0, theta_0, theta_0, theta_0]       
-        
-        # CONTINUE HERE                       
+        self.count_steps = 0
+                           
         self.xi = [x1, x2, x3, x4]                              
         self.xf = [0, 0, 0, 0]
-        self.xf2 = [0, 0, 0, 0]
+        self.x_curr = [x1, x2, x3, x4]                          
         for i in range(len(self.legs)):
             # Gonna take two steps forwards with xf2 TO BE IMPLEMENTED DOWN THE ROAD
             self.xf[i] = self.xi[i] + delta_forward
@@ -129,15 +129,14 @@ class Generator:
        
        
        # Instantiate the segments 
-        self.segments = (Hold(x1, 0.5, 'Task', 0),
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
+        self.segments = (Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
+                         #Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
                          Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
+                         #Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
                          Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
-                         Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                          # For the upwards parabolic movement
-                         Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]))            # For movement along the ground 
+                         #Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]))                         # For the upwards parabolic movement
+                         #Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]),            # For movement along the 
 
 #
 #   Path Spline Functions
@@ -170,10 +169,17 @@ class Generator:
         if (t - self.t0 >= self.segments[self.index].duration()):
             self.t0    = self.t0 + self.segments[self.index].duration()
             # self.index = (self.index+1)
+            
+            # Update position of leg just placed on the ground
+            last_leg = self.segments[self.index].leg()
+            self.x_curr[last_leg] = self.xf[last_leg]                     # Figure out how to change to multiple steps later, could just use bool or add delta
+
             # If the list were cyclic, you could go back to the start with
             self.index = (self.index+1) % len(self.segments)
-            leg = self.segments[self.index].leg()
-            self.q_prev[leg] = self.reset_guess       
+            
+            #for i in range(len(self.legs)):
+            #    self.q_prev[i] = self.reset_guess          
+           
             
         # Check whether we are done with all segments
         if (self.index >= len(self.segments)):
@@ -182,36 +188,72 @@ class Generator:
         
         
         # Determine transforms of body, for now fixed
+        print(self.count_steps)
         R_body = Rz(0.0)
-        p_body = np.array([0.0, 0.0, 1.0]).reshape((3,1))
-        v_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))
+        p_body = np.array([0.04*t, 0.0, 1.0]).reshape((3,1))
+        v_body = np.array([0.04, 0.0, 0.0]).reshape((3,1))
         w_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))       
         T_body = T_from_Rp(R_body, p_body)
-                
-        
+
        
         # Implementation for the different splines    
+        leg = self.segments[self.index].leg()
+        q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        qdot = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
         if (self.segments[self.index].space() == 'Path'):
-            (s, sdot) = self.segments[self.index].evaluate(t-self.t0)
-            leg = self.segments[self.index].leg()
-            
-            # Compute errors and Jacobian from equations
-            (T, J) = self.kin[leg].fkin(self.q_prev[leg])                                   # T and J are in body space
-            x_des = self.pd(s, self.xi[leg], self.xf[leg])                                  # World space
-            xdot_world = self.vd(s, sdot, self.xi[leg], self.xf[leg])                       # World space
-            x_tilda = self.ep(R_body.T @ (x_des - p_body), p_from_T(T))
-            xdot = R_body.T @ (xdot_world - v_body - np.cross(w_body, x_des-p_body, axis=0))
-            
-            # Compute q and qdot using Velocity IKIN Equations
-            xvec = xdot + self.lamb*x_tilda
-            qdot = np.linalg.pinv(J[0:3,:]) @ xvec
-            dt = t-self.t_prev
-            q = self.q_prev[leg] + dt*qdot
-            
-            # Update values to use in next iteration
-            self.q_prev[leg] = q
-            self.t_prev = t
-            
+            for i in range(len(self.legs)):
+                if (i == leg):  
+                # Perform the path spline here for the lifting leg
+                    (s, sdot) = self.segments[self.index].evaluate(t-self.t0)
+                                   
+                    # Compute errors and Jacobian from equations
+                    (T, J) = self.kin[leg].fkin(self.q_prev[leg])                                   # T and J are in body space
+                    x_des = self.pd(s, self.xi[leg], self.xf[leg])                                  # World space
+                    xdot_world = self.vd(s, sdot, self.xi[leg], self.xf[leg])                       # World space
+                    x_tilda = self.ep(R_body.T @ (x_des - p_body), p_from_T(T))
+                    xdot = R_body.T @ (xdot_world - v_body - np.cross(w_body, x_des-p_body, axis=0))
+                    
+                    # Compute q and qdot using Velocity IKIN Equations
+                    xvec = xdot + self.lamb*x_tilda
+                    qdot_vals = np.linalg.pinv(J[0:3,:]) @ xvec
+                    dt = t-self.t_prev
+                    q_vals = self.q_prev[leg] + dt*qdot_vals
+                    
+                    # Update values to use in next iteration
+                    self.q_prev[leg] = q_vals
+                    self.t_prev = t
+                    
+                    # Save to general q and qdot list to send to jntmsg later
+                    for j in range(3):
+                        q[3*leg+j] = q_vals[j]
+                        qdot[3*leg+j] = qdot_vals[j]
+                    
+                else:       
+                # Compute new joint positions for all other legs given fixed position, use i
+                    feet_pos = self.x_curr[i]
+                    feet_vel = np.array([0.0, 0.0, 0.0]).reshape((3,1))
+                    pos_prime = R_body.T @ (feet_pos - p_body)                                              # Foot Position in body space     
+                    q_vals = self.kin[i].ikin(pos_prime, self.q_prev[i])                                    # Body Space IKIN
+                    (T, J) = self.kin[i].fkin(q_vals)                                                       # Both T and J are in body space
+                    vel_prime = R_body.T @ (feet_vel - v_body - np.cross(w_body, feet_pos-p_body, axis=0))  # Foot Velocity in body space
+                    qdot_vals = np.linalg.pinv(J[0:3,:]) @ vel_prime
+                    
+                    # Update values to use in next iteration
+                    self.q_prev[i] = q_vals
+                    
+                    # Save to general q and qdot list to send to jntmsg later
+                    for j in range(3):
+                        q[3*i+j] = q_vals[j]
+                        qdot[3*i+j] = qdot_vals[j]
+                    
+                    
+                    
+        # Apply the computed pos/vel into all joint messages
+        for k in range(len(self.jointdict)):  # 3 DOFs per leg
+            self.jntmsg.position[k] = q[k]
+            self.jntmsg.velocity[k] = qdot[k]                     
+        '''
         elif (self.segments[self.index].space() == 'Task'):
             leg = self.segments[self.index].leg()
             (feet_pos, feet_vel) = self.segments[self.index].evaluate(t-self.t0)
@@ -222,12 +264,9 @@ class Generator:
             vel_prime = R_body.T @ (feet_vel - v_body - np.cross(w_body, (feet_pos-p_body), axis=0))    # Foot Velocity in body space
             qdot = np.linalg.pinv(J[0:3,:]) @ vel_prime                  
             self.q_prev[leg] = q
+        '''
         
         
-        # Apply the computed pos/vel into joint messages
-        for j in range(3):  # 3 DOFs per leg
-            self.jntmsg.position[3*(leg)+j] = q[j]
-            self.jntmsg.velocity[3*(leg)+j] = qdot[j]
         
           
         # Set the root link transform
