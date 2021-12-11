@@ -1,2 +1,4 @@
 
 *.pyc
+__pycache__/kinematics.cpython-38.pyc
+*.pyc
