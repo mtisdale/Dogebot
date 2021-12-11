@@ -11,7 +11,6 @@ import kinematics as kin
 from urdf_parser_py.urdf import Robot
 from sensor_msgs.msg     import JointState
 from geometry_msgs.msg   import Vector3, Quaternion, Transform, TransformStamped
-from std_msgs.msg        import Bool
 
 from splines import CubicSpline, Goto, Hold, Stay, QuinticSpline, Goto5
 from kinematics import p_from_T, q_from_T, R_from_T, T_from_Rp, Rx, Ry, Rz
@@ -98,9 +97,6 @@ class Generator:
         # Add some time to make the connections.  This isn't strictly
         # necessary, but avoids sending initial messages into a void.
         rospy.sleep(0.25)
-        
-        rospy.Subscriber('/boolean', Bool, self.receive_Bool)
-
 
 
         # Instantiate the Kinematics
@@ -151,12 +147,6 @@ class Generator:
         
     def ep(self, pd, p):
         return (pd-p)
-
-#
-#   Subscriber Functions
-#
-    def receive_Bool(self, msg):
-        print(msg.data)
 
 #
 #   Update Function

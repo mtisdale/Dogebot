@@ -11,7 +11,6 @@ import kinematics as kin
 from urdf_parser_py.urdf import Robot
 from sensor_msgs.msg     import JointState
 from geometry_msgs.msg   import Vector3, Quaternion, Transform, TransformStamped
-from std_msgs.msg        import Bool
 
 from splines import CubicSpline, Goto, Hold, Stay, QuinticSpline, Goto5
 from kinematics import p_from_T, q_from_T, R_from_T, T_from_Rp, Rx, Ry, Rz
@@ -61,17 +60,6 @@ class Generator:
                             'hip_2_z': 3, 'hip_2_x': 4, 'knee_2': 5,
                             'hip_3_z': 6, 'hip_3_x': 7, 'knee_3': 8,
                             'hip_4_z': 9, 'hip_4_x': 10, 'knee_4': 11}
-#        self.jointdict = {}
-#        for joint in robot.joints:
-#            if ((joint.type == 'continuous') or
-#                (joint.type == 'revolute') or
-#                (joint.type == 'prismatic')):
-#                n = len(self.jointdict)
-#                self.jointdict[joint.name] = n
-#                rospy.loginfo("Joint %2d: '%s'", n, joint.name)
-#            elif (joint.type != 'fixed'):
-#                # There shouldn't be any other types...
-#                rospy.logwarn("Joint '%s' has unknown type %s", joint.name, joint.type)
 
         # Grab the URDF root link name. This is the link "body" of our URDF
         root = robot.joints[0].parent
@@ -99,9 +87,6 @@ class Generator:
         # necessary, but avoids sending initial messages into a void.
         rospy.sleep(0.25)
         
-        rospy.Subscriber('/boolean', Bool, self.receive_Bool)
-
-
 
         # Instantiate the Kinematics
         self.kin_1 = kin.Kinematics(robot, 'body', 'tip_1') 
@@ -133,7 +118,6 @@ class Generator:
         self.t0    = 0.0
         self.t_prev = 0.0
         self.lamb = 0.5
-        self.last_guess = [q1, q2, q3, q4]                     # Make into 4 legs later
         self.last_guess = theta_guess
         self.reset_guess = [q1, q2, q3, q4]                     # Aligned with URDF leg chain numbers
         self.q_prev = [q1, q2, q3, q4]                          # Aligned with URDF leg chain numbers    
@@ -141,23 +125,18 @@ class Generator:
         self.xf = [0, 0, 0, 0]
         for i in range(len(self.legs)):
             self.xf[i] = self.xi[i] + delta_forward
-        
-        
-        self.segments = (Hold(x1, 1.0, 'Task', 0),
-                        Goto5(0.0, 2.0, self.stride_freq, 'Path', 0),
-                        Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', 0))
        
        
-       # Instantiate the segments  add small holds in between each Goto5 maybe
-#        self.segments = (Hold(x1, 1.0, 'Task'),
-#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
-#                         Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
-#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
-#                         Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
-#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
-#                         Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
-#                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                          # For the upwards parabolic movement
-#                         Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]))            # For movement along the ground 
+       # Instantiate the segments 
+        self.segments = (Hold(x1, 1.0, 'Task'),
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
+                         Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
+                         Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
+                         Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                          # For the upwards parabolic movement
+                         Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]))            # For movement along the ground 
 
 #
 #   Path Spline Functions
@@ -180,12 +159,6 @@ class Generator:
         
     def ep(self, pd, p):
         return (pd-p)
-
-#
-#   Subscriber Functions
-#
-    def receive_Bool(self, msg):
-        print(msg.data)
 
 #
 #   Update Function
@@ -222,30 +195,7 @@ class Generator:
             # Compute errors and Jacobian from equations
             (T, J) = self.kin[leg].fkin(self.q_prev[leg]) 
             
-            print('q prev: \n', self.q_prev[leg])
-            
-            T_whole = T_body @ T
-            x_tilda = self.ep(self.pd(s, self.xi[leg], self.xf[leg]), p_from_T(T_whole))
-            x_tilda_body = R_body.T @ (x_tilda - p_body)
-            xdot = self.vd(s, sdot, self.xi[leg], self.xf[leg])
-            xdot_body = R_body.T @ (xdot - v_body - np.cross(w_body, (p_from_T(T_whole)-p_body), axis=0))
-            
-            #xi_body = R_body.T @ (self.xi[leg] - p_body)                                                     
-            #xf_body = R_body.T @ (self.xf[leg] - p_body)                                                    
-            #print(p_from_T(T))
-            #x_tilda = self.ep(self.pd(s, xi_body, xf_body), p_from_T(T))    
-            #x_tilda_prime = self.ep(self.pd(s, self.xi[leg], self.xf[leg]), p_from_T(T))             
-            #xdot = self.vd(s, sdot, xi_body, xf_body)
-            
-            # Body Space
-            #x_tilda = R_body.T @ x_tilda_prime
-            #xdot = R_body.T @ (xdot2 - v_body) 
-            
-            # Compute q and qdot using Velocity IKIN Equations
-            xvec = xdot + self.lamb*x_tilda          
-            #xvec_body = R_body.T @ (xvec - p_body)  
-            xvec_body = xdot_body + self.lamb*x_tilda_body
-            qdot = np.linalg.inv(J[0:3,:]) @ xvec_body
+            qdot = np.linalg.pinv(J[0:3,:]) @ xvec
             dt = t-self.t_prev
             q = self.q_prev[leg] + dt*qdot
             
@@ -298,7 +248,7 @@ if __name__ == "__main__":
     generator = Generator()
 
     # Prepare a servo loop at 100Hz.
-    rate  = 20;
+    rate  = 100;
     servo = rospy.Rate(rate)
     dt    = servo.sleep_dur.to_sec()
     rospy.loginfo("Running the servo loop with dt of %f seconds (%fHz)" %
