@@ -201,12 +201,12 @@ class Generator:
         elif (self.segments[self.index].space() == 'Task'):
             (feet_pos, feet_vel) = self.segments[self.index].evaluate(t-self.t0)
             pos_prime = R_body.T @ (feet_pos-p_body)                                                    # Foot Position in body space
-            q = self.kin_1.ikin(pos_prime, self.last_guess)                                          # IKIN is with respect to body space
+            q = self.kin_1.ikin(pos_prime, self.q_prev)                                          # IKIN is with respect to body space
             (T, J) = self.kin_1.fkin(q)                                                              # T and J are both in body space
             vel_prime = R_body.T @ (feet_vel-v_body-np.cross(w_body, (feet_pos-p_body), axis=0))    # Foot Velocity in body space
             qdot = np.linalg.inv(J[0:3,:]) @ vel_prime      
             # Change below last guess to account for all legs later                
-            self.last_guess = q
+            self.q_prev = q
         
         
         # Apply the computed pos/vel into joint messages

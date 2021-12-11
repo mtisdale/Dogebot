@@ -2,3 +2,5 @@
 *.pyc
 __pycache__/kinematics.cpython-38.pyc
 *.pyc
+__pycache__/kinematics.cpython-38.pyc
+__pycache__/splines.cpython-38.pyc

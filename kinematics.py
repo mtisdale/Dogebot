@@ -176,7 +176,7 @@ class Kinematics:
         	delta_x = x_goal - p_from_T(T)
         	theta_ikin = theta_ikin + (J_inv @ delta_x)
         	count += 1
-        #print(theta_ikin)
+        #print('theta_ikin: \n', theta_ikin)
         return theta_ikin
 	
     def fkin(self, theta):
