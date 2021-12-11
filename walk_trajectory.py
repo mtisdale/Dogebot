@@ -94,7 +94,7 @@ class Generator:
         self.kin_3 = kin.Kinematics(robot, 'body', 'tip_3') 
         self.kin_4 = kin.Kinematics(robot, 'body', 'tip_4')     
         self.kin = [self.kin_1, self.kin_2, self.kin_3, self.kin_4]
-        self.stride_freq = 3.0
+        self.stride_freq = 1.0
         self.stride_ht = 0.3
         self.legs = [0, 1, 2, 3]                                        # Order of leg cycling
         delta_forward = np.array([0.5, 0.0, 0.0]).reshape((3,1))        # For determining xf
@@ -112,6 +112,7 @@ class Generator:
         # Instantiate update function variables
         self.index = 0
         self.t0    = 0.0
+        self.t1 = 0.0
         self.t_prev = 0.0
         self.lamb = 0.5
         self.reset_guess = theta_0       
@@ -120,23 +121,25 @@ class Generator:
                            
         self.xi = [x1, x2, x3, x4]                              
         self.xf = [0, 0, 0, 0]
-        self.x_curr = [x1, x2, x3, x4]                          
+        self.xf2 = [0, 0, 0, 0]
+        self.x_curr = [x1, x2, x3, x4]      
+        # self.v = 1.0 / (4*len(self.legs))
+        self.v = 0.08
         for i in range(len(self.legs)):
-            # Gonna take two steps forwards with xf2 TO BE IMPLEMENTED DOWN THE ROAD
             self.xf[i] = self.xi[i] + delta_forward
-            # self.xf2[i] = self.xf[i] + delta_forward
+            self.xf2[i] = self.xf[i] + delta_forward
             
        
        
        # Instantiate the segments 
         self.segments = (Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
-                         #Goto5(self.xf[0], self.xi[0], self.stride_freq, 'Task', self.legs[0]),            # For movement along the ground
                          Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
-                         #Goto5(self.xf[1], self.xi[1], self.stride_freq, 'Task', self.legs[1]),            # For movement along the ground
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement  
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]),                           # For the upwards parabolic movement
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[0]),                           # For the upwards parabolic movement
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[1]),                           # For the upwards parabolic movement
                          Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[2]),                           # For the upwards parabolic movement
-                         #Goto5(self.xf[2], self.xi[2], self.stride_freq, 'Task', self.legs[2]),             # For movement along the ground      
-                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]))                         # For the upwards parabolic movement
-                         #Goto5(self.xf[3], self.xi[3], self.stride_freq, 'Task', self.legs[3]),            # For movement along the 
+                         Goto5(0.0, 2.0, self.stride_freq, 'Path', self.legs[3]))                           # For the upwards parabolic movement
 
 #
 #   Path Spline Functions
@@ -169,48 +172,75 @@ class Generator:
         if (t - self.t0 >= self.segments[self.index].duration()):
             self.t0    = self.t0 + self.segments[self.index].duration()
             # self.index = (self.index+1)
-            
+
             # Update position of leg just placed on the ground
             last_leg = self.segments[self.index].leg()
-            self.x_curr[last_leg] = self.xf[last_leg]                     # Figure out how to change to multiple steps later, could just use bool or add delta
-
-            # If the list were cyclic, you could go back to the start with
-            self.index = (self.index+1) % len(self.segments)
+            phase = int(self.count_steps / len(self.legs)) % len(self.legs)
+            if (phase == 3):
+                self.x_curr[last_leg] = self.xi[last_leg]    
+            elif (phase == 2):
+                self.x_curr[last_leg] = self.xf[last_leg]
+            elif (phase == 1):
+                self.x_curr[last_leg] = self.xf2[last_leg]
+            else:
+                self.x_curr[last_leg] = self.xf[last_leg]                
+            self.count_steps += 1
             
-            #for i in range(len(self.legs)):
-            #    self.q_prev[i] = self.reset_guess          
-           
+            # If the list were cyclic, you could go back to the start with
+            self.index = (self.index+1) % len(self.segments)   
+            if (self.index == 0):
+                self.t1 = self.t0
             
         # Check whether we are done with all segments
         if (self.index >= len(self.segments)):
             rospy.signal_shutdown("Done with motion")
             return
         
-        
-        # Determine transforms of body, for now fixed
-        print(self.count_steps)
-        R_body = Rz(0.0)
-        p_body = np.array([0.04*t, 0.0, 1.0]).reshape((3,1))
-        v_body = np.array([0.04, 0.0, 0.0]).reshape((3,1))
-        w_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))       
-        T_body = T_from_Rp(R_body, p_body)
-
-       
         # Implementation for the different splines    
         leg = self.segments[self.index].leg()
+        phase = int(self.count_steps / len(self.legs)) % len(self.legs)
         q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         qdot = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        # Determine transforms of body, for now fixed
+        # I NEED TO FIGURE OUT THIS EXACTLY FOR A CONTINUOUS LOOP
+        if (phase == 2 or phase == 3):
+            x_pos = -self.v*(t-self.t1) + self.t1*self.v
+            p_body = np.array([x_pos, 0.0, 1.0]).reshape((3,1))
+            v_body = np.array([-self.v, 0.0, 0.0]).reshape((3,1))
+        else:
+            x_pos = self.v*(t-self.t1)
+            p_body = np.array([x_pos, 0.0, 1.0]).reshape((3,1))
+            v_body = np.array([self.v, 0.0, 0.0]).reshape((3,1))
+        R_body = Rz(0.0)
+        w_body = np.array([0.0, 0.0, 0.0]).reshape((3,1))       
+        T_body = T_from_Rp(R_body, p_body)
+        
         
         if (self.segments[self.index].space() == 'Path'):
             for i in range(len(self.legs)):
                 if (i == leg):  
                 # Perform the path spline here for the lifting leg
                     (s, sdot) = self.segments[self.index].evaluate(t-self.t0)
-                                   
+                    
+                    # Choose the start and end position                      
+                    if (phase == 3):
+                        xi = self.xf[leg]
+                        xf = self.xi[leg]    
+                    elif (phase == 2):
+                        xi = self.xf2[leg]
+                        xf = self.xf[leg]
+                    elif (phase == 1):
+                        xi = self.xf[leg]
+                        xf = self.xf2[leg]  
+                    else:
+                        xi = self.xi[leg]
+                        xf = self.xf[leg]
+                    
                     # Compute errors and Jacobian from equations
                     (T, J) = self.kin[leg].fkin(self.q_prev[leg])                                   # T and J are in body space
-                    x_des = self.pd(s, self.xi[leg], self.xf[leg])                                  # World space
-                    xdot_world = self.vd(s, sdot, self.xi[leg], self.xf[leg])                       # World space
+                    x_des = self.pd(s, xi, xf)                                                      # World space
+                    xdot_world = self.vd(s, sdot, xi, xf)                                           # World space
                     x_tilda = self.ep(R_body.T @ (x_des - p_body), p_from_T(T))
                     xdot = R_body.T @ (xdot_world - v_body - np.cross(w_body, x_des-p_body, axis=0))
                     
@@ -265,9 +295,6 @@ class Generator:
             qdot = np.linalg.pinv(J[0:3,:]) @ vel_prime                  
             self.q_prev[leg] = q
         '''
-        
-        
-        
           
         # Set the root link transform
         self.tfmsg.transform = transform_from_T(T_body)
