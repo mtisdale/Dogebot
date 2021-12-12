@@ -111,8 +111,9 @@ class Generator:
         
         # Instantiate update function variables
         self.index = 0
-        self.t0    = 0.0
-        self.t1 = 0.0
+        self.t0    = 0.0                                # Keeps track of when to switch segments
+        self.t1 = 0.0                                   # Keeps track of when the bot is moving forwards
+        self.t2 = 2*len(self.legs)*self.stride_freq     # Keeps track of when the bot is moving backwards
         self.t_prev = 0.0
         self.lamb = 0.5
         self.reset_guess = theta_0       
@@ -123,12 +124,10 @@ class Generator:
         self.xf = [0, 0, 0, 0]
         self.xf2 = [0, 0, 0, 0]
         self.x_curr = [x1, x2, x3, x4]      
-        # self.v = 1.0 / (4*len(self.legs))
         self.v = 0.08
         for i in range(len(self.legs)):
             self.xf[i] = self.xi[i] + delta_forward
             self.xf2[i] = self.xf[i] + delta_forward
-            
        
        
        # Instantiate the segments 
@@ -189,7 +188,8 @@ class Generator:
             # If the list were cyclic, you could go back to the start with
             self.index = (self.index+1) % len(self.segments)   
             if (self.index == 0):
-                self.t1 = self.t0
+                self.t1 += 2*len(self.legs)*self.stride_freq
+                self.t2 += 2*len(self.legs)*self.stride_freq
             
         # Check whether we are done with all segments
         if (self.index >= len(self.segments)):
@@ -203,9 +203,8 @@ class Generator:
         qdot = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         
         # Determine transforms of body, for now fixed
-        # I NEED TO FIGURE OUT THIS EXACTLY FOR A CONTINUOUS LOOP
         if (phase == 2 or phase == 3):
-            x_pos = -self.v*(t-self.t1) + self.t1*self.v
+            x_pos = -self.v*(t-self.t2)
             p_body = np.array([x_pos, 0.0, 1.0]).reshape((3,1))
             v_body = np.array([-self.v, 0.0, 0.0]).reshape((3,1))
         else:
